@@ -168,13 +168,13 @@ def export_filtered(
 ):
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
     if client:
-        ws_query = ws_query.join(Client).filter(Client.name == client)
+        ws_query = ws_query.join(Client).filter(Client.name.ilike(f"%{client.strip()}%"))
     if ram:
-        ws_query = ws_query.filter(Workstation.ram_gb == ram)
+        ws_query = ws_query.filter(Workstation.ram_gb.ilike(f"%{ram.strip()}%"))
     if technician:
-        ws_query = ws_query.filter(Workstation.technician == technician)
+        ws_query = ws_query.filter(Workstation.technician.ilike(f"%{technician.strip()}%"))
     if status:
-        ws_query = ws_query.filter(Workstation.status == status)
+        ws_query = ws_query.filter(Workstation.status.ilike(f"%{status.strip()}%"))
     if search:
         like = f"%{search}%"
         ws_query = ws_query.filter(

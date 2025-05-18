@@ -50,17 +50,18 @@
             </datalist>
         </span>
         <span class="filter-wrap">
-            <input type="text" id="textSearch" placeholder="Search all...">
+            <input type="text" id="textSearch" placeholder="Search all fields...">
             <button class="clear-x" id="searchClearX" type="button" title="Clear">&times;</button>
         </span>
-        <button id="clearFilters" type="button">Clear</button>
-        <a id="exportBtn" href="#">Export CSV</a>
+        <button id="clearFilters" type="button" class="import-btn">Clear</button>
+        <a id="exportBtn" href="#" class="import-btn">Export CSV</a>
     </div>
     {% for client in clients %}
         <div class="client-group">
             <div class="client-header" onclick="toggleClient('{{ client.name|replace(' ', '_') }}')">
                 <span class="collapse-toggle" id="toggle-{{ client.name|replace(' ', '_') }}">[+]</span>
-                <strong>{{ client.name }}</strong> <span>({{ client.workstations|length }} systems)</span>
+                <strong>{{ client.name }}</strong>&nbsp; <span>({{ client.workstations|length }} systems)</span>
+                &nbsp;&nbsp;&nbsp;<button class="import-btn" type="button" onclick="event.stopPropagation(); showAddModal({{ client.id }}, '{{ client.name }}')">+ Add Workstation</button>
             </div>
             <div id="client-{{ client.name|replace(' ', '_') }}" class="workstations" style="display: none;">
                 <table>
@@ -72,9 +73,10 @@
                         <th>Status</th>
                         <th>Technician</th>
                         <th>Notes</th>
+                        <th>Actions</th>
                     </tr>
                     {% for ws in client.workstations %}
-                        <tr>
+                        <tr data-wsid="{{ ws.id }}">
                             <td>{{ ws.computer_name }}</td>
                             <td>{{ ws.processor_name }}</td>
                             <td>{{ ws.ram_gb }}GB</td>
@@ -99,12 +101,73 @@
                             <td>
                                 <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)">
                             </td>
+                            <td>
+                                <button class="import-btn" type="button" style="background:#5c51a4;" onclick="showEditModal({{ ws.id }})">Edit</button>
+                                <form method="post" action="/workstations/{{ ws.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this workstation?');">
+                                    <button type="submit" class="import-btn" style="background:#bb3f3f;">Delete</button>
+                                </form>
+                            </td>
                         </tr>
                     {% endfor %}
                 </table>
             </div>
         </div>
     {% endfor %}
+    <!-- Add Workstation Modal -->
+    <div id="addModal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal('addModal')">&times;</span>
+        <form method="post" action="/workstations/add" id="addForm" autocomplete="off">
+          <input type="hidden" name="client_id" id="add_client_id">
+          <h2>Add Workstation for <span id="add_client_name"></span></h2>
+          <div style="color: #999; font-size: 0.9em;">(Debug: client_id = <span id="debug_client_id"></span>)</div>
+          <label>Computer Name: <input name="computer_name" required autocomplete="off"></label><br>
+          <label>Processor Name: <input name="processor_name" required autocomplete="off"></label><br>
+          <label>RAM (GB): <input name="ram_gb" required autocomplete="off"></label><br>
+          <label>Remaining Disk (GB): <input name="diskspace_remaining_gb" required autocomplete="off"></label><br>
+          <label>Status: <select name="status" required>
+            {% for status in statuses %}
+              <option value="{{ status }}">{{ status }}</option>
+            {% endfor %}
+          </select></label><br>
+          <label>Technician: <select name="technician">
+            <option value="">- Technician -</option>
+            {% for t in technicians %}
+              <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select></label><br>
+          <label>Notes: <input name="notes" autocomplete="off"></label><br>
+          <button type="submit" class="import-btn">Add</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Edit Workstation Modal -->
+    <div id="editModal" class="modal" style="display:none;">
+      <div class="modal-content">
+        <span class="close" onclick="closeModal('editModal')">&times;</span>
+        <form method="post" id="editForm">
+          <h2>Edit Workstation</h2>
+          <label>Computer Name: <input name="computer_name" id="edit_computer_name" required></label><br>
+          <label>Processor Name: <input name="processor_name" id="edit_processor_name" required></label><br>
+          <label>RAM (GB): <input name="ram_gb" id="edit_ram_gb" required></label><br>
+          <label>Remaining Disk (GB): <input name="diskspace_remaining_gb" id="edit_diskspace_remaining_gb" required></label><br>
+          <label>Status: <select name="status" id="edit_status" required>
+            {% for status in statuses %}
+              <option value="{{ status }}">{{ status }}</option>
+            {% endfor %}
+          </select></label><br>
+          <label>Technician: <select name="technician" id="edit_technician">
+            <option value="">- Technician -</option>
+            {% for t in technicians %}
+              <option value="{{ t }}">{{ t }}</option>
+            {% endfor %}
+          </select></label><br>
+          <label>Notes: <input name="notes" id="edit_notes"></label><br>
+          <button type="submit" class="import-btn" style="background:#5c51a4;">Save</button>
+        </form>
+      </div>
+    </div>
     <div class="import-section">
         <div class="import-title">
             <strong>Replace All Data with CSV Import</strong>

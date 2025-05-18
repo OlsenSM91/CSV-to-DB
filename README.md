@@ -1,6 +1,8 @@
 # CSV Filtering App
 
 ![win11dash](https://github.com/user-attachments/assets/f1b1e246-8240-4023-9129-1e54b8422929)
+## CRUD Update
+![crudUpdate](https://github.com/user-attachments/assets/b19f2c29-bd77-4acc-8d92-f5e3c31e0406)
 
 A simple, open-source dashboard for managing, filtering, and tracking bulk assets or projects based on CSV data. Originally built for planning and scheduling Windows 11 workstation upgrades at Computer Networking Solutions, Inc. (CNS), this app can be repurposed for any scenario where you need to view, search, filter, update, and export CSV-based lists.
 
@@ -12,6 +14,7 @@ A simple, open-source dashboard for managing, filtering, and tracking bulk asset
 - In-place editing for select fields (e.g., status, technician, notes).
 - Export filtered view to CSV.
 - Responsive, modern interface.
+- Edit/Delete/Add New workstations to clients
 
 ## Getting Started
 

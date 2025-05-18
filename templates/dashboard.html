@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Windows 11 Upgrade Dashboard</title>
+    <link rel="icon" type="image/png" href="https://www.cns4u.com/wp-content/uploads/2024/12/cropped-favicon-32x32.png">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="/static/main.js" defer></script>
+</head>
+<body>
+    <div class="brand-header">
+        <img src="https://cns4u.com/logo/logo-1024px-lightbg-logo.png" class="logo" alt="CNS Logo">
+        <h1>Windows 11 Upgrade Dashboard</h1>
+    </div>
+    <div class="filters">
+        <span class="filter-wrap">
+            <input id="clientFilter" list="clientList" placeholder="Client Name">
+            <button class="clear-x" id="clientClearX" type="button" title="Clear">&times;</button>
+            <datalist id="clientList">
+                {% for c in all_clients %}
+                    <option value="{{c}}">
+                {% endfor %}
+            </datalist>
+        </span>
+        <span class="filter-wrap">
+            <input id="ramFilter" list="ramList" placeholder="RAM">
+            <button class="clear-x" id="ramClearX" type="button" title="Clear">&times;</button>
+            <datalist id="ramList">
+                {% for r in all_ram %}
+                    <option value="{{r}}">
+                {% endfor %}
+            </datalist>
+        </span>
+        <span class="filter-wrap">
+            <input id="technicianFilter" list="technicianList" placeholder="Technician">
+            <button class="clear-x" id="technicianClearX" type="button" title="Clear">&times;</button>
+            <datalist id="technicianList">
+                {% for t in technicians %}
+                    <option value="{{t}}">
+                {% endfor %}
+            </datalist>
+        </span>
+        <span class="filter-wrap">
+            <input id="statusFilter" list="statusList" placeholder="Status">
+            <button class="clear-x" id="statusClearX" type="button" title="Clear">&times;</button>
+            <datalist id="statusList">
+                {% for s in statuses %}
+                    <option value="{{s}}">
+                {% endfor %}
+            </datalist>
+        </span>
+        <span class="filter-wrap">
+            <input type="text" id="textSearch" placeholder="Search all...">
+            <button class="clear-x" id="searchClearX" type="button" title="Clear">&times;</button>
+        </span>
+        <button id="clearFilters" type="button">Clear</button>
+        <a id="exportBtn" href="#">Export CSV</a>
+    </div>
+    {% for client in clients %}
+        <div class="client-group">
+            <div class="client-header" onclick="toggleClient('{{ client.name|replace(' ', '_') }}')">
+                <span class="collapse-toggle" id="toggle-{{ client.name|replace(' ', '_') }}">[+]</span>
+                <strong>{{ client.name }}</strong> <span>({{ client.workstations|length }} systems)</span>
+            </div>
+            <div id="client-{{ client.name|replace(' ', '_') }}" class="workstations" style="display: none;">
+                <table>
+                    <tr>
+                        <th>Computer Name</th>
+                        <th>Processor</th>
+                        <th>RAM</th>
+                        <th>Remaining Disk</th>
+                        <th>Status</th>
+                        <th>Technician</th>
+                        <th>Notes</th>
+                    </tr>
+                    {% for ws in client.workstations %}
+                        <tr>
+                            <td>{{ ws.computer_name }}</td>
+                            <td>{{ ws.processor_name }}</td>
+                            <td>{{ ws.ram_gb }}GB</td>
+                            <td>{{ ws.diskspace_remaining_gb }}GB</td>
+                            <td>
+                                <select onchange="updateField({{ ws.id }}, 'status', this.value)">
+                                    {% for status in statuses %}
+                                        <option value="{{ status }}" {% if ws.status == status %}selected{% endif %}>
+                                            {{ status }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <select onchange="updateField({{ ws.id }}, 'technician', this.value)">
+                                    <option value="">- Technician -</option>
+                                    {% for tech in technicians %}
+                                        <option value="{{ tech }}" {% if ws.technician == tech %}selected{% endif %}>{{ tech }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)">
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </table>
+            </div>
+        </div>
+    {% endfor %}
+    <div class="import-section">
+        <div class="import-title">
+            <strong>Replace All Data with CSV Import</strong>
+            <div class="import-desc">
+                Uploading a CSV here will <span class="import-warning">wipe all current workstation and client data</span> and replace it with the contents of the CSV. This action cannot be undone.
+            </div>
+        </div>
+        <form method="post" enctype="multipart/form-data" action="/import" class="import-form">
+            <label class="file-label">
+                <input type="file" name="file" accept=".csv" required>
+                <span>Select CSV File</span>
+            </label>
+            <button type="submit" class="import-btn">Import/Replace Data</button>
+        </form>
+    </div>
+</body>
+</html>

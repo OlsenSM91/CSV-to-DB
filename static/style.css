@@ -1,0 +1,270 @@
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    margin: 0;
+    background: #f8f8fb;
+    color: #222;
+}
+
+.brand-header {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    border-bottom: 1px solid #e0e6ee;
+    margin-bottom: 32px;
+    padding: 24px 0 12px 0;
+    box-shadow: 0 2px 8px #0001;
+}
+
+.brand-header .logo {
+    height: 64px;
+    margin-right: 24px;
+}
+
+.brand-header h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 700;
+    color: #003459;
+    letter-spacing: 1px;
+}
+
+.filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: center;
+    margin: 0 32px 24px 32px;
+    padding: 12px 0;
+}
+
+.filters input, .filters select, .filters button, .filters a {
+    padding: 7px 12px;
+    border-radius: 5px;
+    border: 1px solid #b2bfd8;
+    font-size: 1em;
+}
+
+.filters input:focus, .filters select:focus {
+    outline: 2px solid #36b9f6;
+}
+
+.filters button {
+    background: #f3f7fc;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.filters #clearFilters {
+    background: #e85353;
+    color: #fff;
+    border: none;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+.filters #clearFilters:hover {
+    background: #c10e0e;
+}
+
+.filters a {
+    background: #006aad;
+    color: #fff;
+    text-decoration: none;
+    font-weight: bold;
+    border: none;
+    transition: background 0.2s;
+}
+.filters a:hover {
+    background: #004e81;
+}
+
+.import-form {
+    margin: 0 32px 28px 32px;
+    display: flex;
+    gap: 8px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 16px;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px #0001;
+}
+
+th, td {
+    border: 1px solid #dde5ed;
+    padding: 7px 10px;
+    text-align: left;
+}
+
+th {
+    background: #f3f7fc;
+    font-weight: 700;
+    color: #003459;
+    font-size: 1.02em;
+}
+
+tr:nth-child(even) td {
+    background: #f8fbff;
+}
+
+tr:hover td {
+    background: #eaf4fb;
+}
+
+.client-group {
+    margin: 0 32px 28px 32px;
+    border: 1px solid #cdd8ef;
+    border-radius: 8px;
+    background: #fafdff;
+    box-shadow: 0 2px 8px #0001;
+}
+
+.client-header {
+    padding: 12px 20px;
+    cursor: pointer;
+    background: #ddeefd;
+    border-radius: 8px 8px 0 0;
+    font-size: 1.12em;
+    user-select: none;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+}
+
+.collapse-toggle {
+    font-weight: bold;
+    margin-right: 12px;
+    color: #0089d1;
+}
+
+input[type="text"], select {
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 3px;
+    border: 1px solid #b2bfd8;
+    background: #fcfcfe;
+    box-sizing: border-box;
+}
+
+input[type="file"] {
+    margin-right: 8px;
+}
+
+@media (max-width: 900px) {
+    .filters, .import-form, .client-group {
+        margin: 0 6px 16px 6px;
+    }
+    .brand-header {
+        flex-direction: column;
+        padding: 12px 0 8px 0;
+    }
+    .brand-header .logo {
+        margin-bottom: 10px;
+    }
+    table, th, td {
+        font-size: 0.97em;
+    }
+}
+
+.filter-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+.clear-x {
+    display: none;
+    position: absolute;
+    right: 3px;
+    top: 50%;
+    transform: translateY(-50%);
+    border: none;
+    background: transparent;
+    color: #b0b0b0;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 2px;
+    z-index: 10;
+}
+.clear-x:hover {
+    color: #d00;
+    background: #fff;
+    border-radius: 2px;
+}
+.filters input {
+    padding-right: 22px;
+}
+.import-section {
+    margin: 32px 32px 24px 32px;
+    padding: 18px 22px;
+    background: #fafdff;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px #0001;
+    border: 1px solid #e6eaf5;
+}
+
+.import-title {
+    font-size: 1.13em;
+    margin-bottom: 6px;
+}
+
+.import-desc {
+    font-size: 0.98em;
+    color: #444;
+    margin-top: 2px;
+}
+
+.import-warning {
+    color: #c10e0e;
+    font-weight: bold;
+}
+
+.import-form {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    margin-top: 10px;
+}
+
+.file-label {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 15px;
+    background: #fff;
+    border: 1px solid #b2bfd8;
+    border-radius: 5px;
+    font-weight: 500;
+    color: #003459;
+    cursor: pointer;
+    transition: border-color 0.18s;
+    margin-right: 8px;
+    position: relative;
+}
+
+.file-label input[type="file"] {
+    display: none;
+}
+
+.file-label span {
+    font-size: 1em;
+    padding-left: 2px;
+}
+
+.import-btn {
+    background: #006aad;
+    color: #fff;
+    border: none;
+    padding: 8px 18px;
+    border-radius: 5px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    box-shadow: 0 1px 4px #0001;
+}
+.import-btn:hover {
+    background: #004e81;
+}

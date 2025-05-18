@@ -1,10 +1,13 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse
+from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
+from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import create_engine, select, or_, and_, func
 from sqlalchemy.orm import sessionmaker, joinedload
+from starlette.status import HTTP_303_SEE_OTHER
 import os
+import io
+import csv
 from models import Base, Client, Workstation
 from utils import import_csv_to_db, export_workstations
 
@@ -41,7 +44,6 @@ def dashboard(
     db=Depends(get_db)
 ):
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
-    # Filtering logic
     if client:
         ws_query = ws_query.join(Client).filter(Client.name == client)
     if ram:
@@ -62,17 +64,26 @@ def dashboard(
             )
         )
     workstations = ws_query.all()
-    # Group by client
+
+    # --- NEW GROUPING LOGIC ---
     clients = {}
     for ws in workstations:
-        cname = ws.client.name if ws.client else "Unknown"
-        if cname not in clients:
-            clients[cname] = []
-        clients[cname].append(ws)
-    clients_list = [{"name": cname, "workstations": wss} for cname, wss in sorted(clients.items())]
-    # Dropdown lists
+        # Key on client id, not just name
+        if ws.client:
+            cid = ws.client.id
+            cname = ws.client.name
+        else:
+            cid = None
+            cname = "Unknown"
+        if cid not in clients:
+            clients[cid] = {"id": cid, "name": cname, "workstations": []}
+        clients[cid]["workstations"].append(ws)
+    clients_list = list(clients.values())
+    clients_list.sort(key=lambda c: c["name"])
+
     all_clients = [c.name for c in db.query(Client).order_by(Client.name)]
     all_ram = sorted(set(ws.ram_gb for ws in db.query(Workstation) if ws.ram_gb))
+    all_clients_objs = db.query(Client).order_by(Client.name).all()
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "clients": clients_list,
@@ -80,55 +91,90 @@ def dashboard(
         "statuses": STATUS_LIST,
         "all_clients": all_clients,
         "all_ram": all_ram,
-        "filter_client": client,
-        "filter_ram": ram,
-        "filter_technician": technician,
-        "filter_status": status,
-        "search": search
+        "all_clients_objs": all_clients_objs,
     })
 
-@app.post("/update", response_class=HTMLResponse)
-async def update_ws(
-    id: int = Form(...), field: str = Form(...), value: str = Form(...), db=Depends(get_db)
+@app.post("/workstations/add")
+async def add_workstation(
+    request: Request,
+    client_id: int = Form(...),
+    computer_name: str = Form(...),
+    processor_name: str = Form(...),
+    ram_gb: str = Form(...),
+    diskspace_remaining_gb: str = Form(...),
+    status: str = Form(...),
+    technician: str = Form(""),
+    notes: str = Form(""),
+    db=Depends(get_db)
 ):
-    ws = db.query(Workstation).filter_by(id=id).first()
-    if not ws:
-        return {"success": False, "msg": "Not found"}
-    if field in {"status", "technician", "notes"}:
-        setattr(ws, field, value)
-        db.commit()
-        return {"success": True}
-    return {"success": False, "msg": "Invalid field"}
+    ws = Workstation(
+        client_id=client_id,
+        computer_name=computer_name,
+        processor_name=processor_name,
+        ram_gb=ram_gb,
+        diskspace_remaining_gb=diskspace_remaining_gb,
+        status=status,
+        technician=technician,
+        notes=notes,
+    )
+    db.add(ws)
+    db.commit()
+    return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
-@app.post("/import", response_class=HTMLResponse)
-async def import_csv(file: UploadFile = File(...), db=Depends(get_db)):
-    file_location = "uploaded.csv"
-    with open(file_location, "wb") as f:
-        f.write(await file.read())
-    import_csv_to_db(file_location, db)
-    os.remove(file_location)
-    return RedirectResponse(url="/", status_code=303)
+@app.post("/workstations/{ws_id}/edit")
+async def edit_workstation(
+    ws_id: int,
+    computer_name: str = Form(...),
+    processor_name: str = Form(...),
+    ram_gb: str = Form(...),
+    diskspace_remaining_gb: str = Form(...),
+    status: str = Form(...),
+    technician: str = Form(""),
+    notes: str = Form(""),
+    db=Depends(get_db)
+):
+    ws = db.query(Workstation).filter_by(id=ws_id).first()
+    if not ws:
+        raise HTTPException(status_code=404, detail="Workstation not found")
+    ws.computer_name = computer_name
+    ws.processor_name = processor_name
+    ws.ram_gb = ram_gb
+    ws.diskspace_remaining_gb = diskspace_remaining_gb
+    ws.status = status
+    ws.technician = technician
+    ws.notes = notes
+    db.commit()
+    return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
+
+@app.post("/workstations/{ws_id}/delete")
+async def delete_workstation(
+    ws_id: int,
+    db=Depends(get_db)
+):
+    ws = db.query(Workstation).filter_by(id=ws_id).first()
+    if ws:
+        db.delete(ws)
+        db.commit()
+    return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
 @app.get("/export")
-def export(
+def export_filtered(
     client: str = "",
     ram: str = "",
     technician: str = "",
     status: str = "",
     search: str = "",
-    export_type: str = "csv",
     db=Depends(get_db)
 ):
-    from sqlalchemy import func
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
     if client:
-        ws_query = ws_query.join(Client).filter(func.lower(Client.name).like(f"%{client.lower()}%"))
+        ws_query = ws_query.join(Client).filter(Client.name == client)
     if ram:
-        ws_query = ws_query.filter(func.lower(Workstation.ram_gb).like(f"%{ram.lower()}%"))
+        ws_query = ws_query.filter(Workstation.ram_gb == ram)
     if technician:
-        ws_query = ws_query.filter(func.lower(Workstation.technician).like(f"%{technician.lower()}%"))
+        ws_query = ws_query.filter(Workstation.technician == technician)
     if status:
-        ws_query = ws_query.filter(func.lower(Workstation.status).like(f"%{status.lower()}%"))
+        ws_query = ws_query.filter(Workstation.status == status)
     if search:
         like = f"%{search}%"
         ws_query = ws_query.filter(
@@ -141,7 +187,46 @@ def export(
             )
         )
     workstations = ws_query.all()
-    buf, mime, fname = export_workstations(workstations, export_type)
-    return StreamingResponse(buf, media_type=mime, headers={
-        "Content-Disposition": f"attachment; filename={fname}"
-    })
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "Client",
+        "Computer Name",
+        "Processor Name",
+        "RAM (GB)",
+        "Disk Space Remaining (GB)",
+        "Status",
+        "Technician",
+        "Notes"
+    ])
+    for ws in workstations:
+        writer.writerow([
+            ws.client.name if ws.client else "",
+            ws.computer_name,
+            ws.processor_name,
+            ws.ram_gb,
+            ws.diskspace_remaining_gb,
+            ws.status,
+            ws.technician,
+            ws.notes
+        ])
+    output.seek(0)
+    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=workstations.csv"})
+
+@app.post("/update")
+async def update_field(
+    id: int = Form(...),
+    field: str = Form(...),
+    value: str = Form(...),
+    db=Depends(get_db)
+):
+    ws = db.query(Workstation).filter_by(id=id).first()
+    if not ws:
+        return JSONResponse({"ok": False, "error": "Not found"})
+    # Only allow specific fields to be updated
+    if field not in ("status", "technician", "notes"):
+        return JSONResponse({"ok": False, "error": "Bad field"})
+    setattr(ws, field, value)
+    db.commit()
+    return JSONResponse({"ok": True})

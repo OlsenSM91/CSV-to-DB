@@ -151,3 +151,45 @@ window.onload = function () {
         });
     }
 };
+
+// ---- Modal logic for Add/Edit Workstation ----
+
+// Show Add Workstation Modal (ALWAYS sets client ID & company name, for debug shows client id)
+function showAddModal(clientId, clientName) {
+    let form = document.getElementById('addForm');
+    form.reset(); // Clear all fields EXCEPT client_id and client_name
+    document.getElementById('add_client_id').value = clientId;
+    document.getElementById('add_client_name').innerText = clientName;
+    // Debug display
+    var dbg = document.getElementById('debug_client_id');
+    if (dbg) dbg.innerText = clientId;
+    document.getElementById('addModal').style.display = 'flex';
+}
+window.showAddModal = showAddModal;
+
+// Show Edit Workstation Modal (fetch workstation details from DOM)
+function showEditModal(wsId) {
+    let row = document.querySelector(`tr[data-wsid='${wsId}']`);
+    if (!row) row = document.querySelector(`button[onclick='showEditModal(${wsId})']`).closest('tr');
+    document.getElementById('editForm').action = `/workstations/${wsId}/edit`;
+    document.getElementById('edit_computer_name').value = row.children[0].innerText;
+    document.getElementById('edit_processor_name').value = row.children[1].innerText;
+    document.getElementById('edit_ram_gb').value = row.children[2].innerText.replace("GB", "");
+    document.getElementById('edit_diskspace_remaining_gb').value = row.children[3].innerText.replace("GB", "");
+    document.getElementById('edit_status').value = row.children[4].querySelector('select').value;
+    document.getElementById('edit_technician').value = row.children[5].querySelector('select').value;
+    document.getElementById('edit_notes').value = row.children[6].querySelector('input').value;
+    document.getElementById('editModal').style.display = 'flex';
+}
+window.showEditModal = showEditModal;
+
+// Close Modal
+function closeModal(modalId) {
+    document.getElementById(modalId).style.display = 'none';
+}
+window.closeModal = closeModal;
+
+// Allow clicking outside modal to close it
+document.addEventListener('click', function(e) {
+    if (e.target.classList && e.target.classList.contains('modal')) closeModal(e.target.id);
+});

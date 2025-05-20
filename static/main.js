@@ -2,7 +2,29 @@ function updateField(id, field, value) {
     fetch("/update", {
         method: "POST",
         body: new URLSearchParams({ id, field, value })
-    }).then(res => res.json());
+    }).then(res => res.json())
+      .then(data => {
+        // If the updated field is status, update the row styling/locking
+        if (field === "status") {
+            setRowCompleted(id, value === "Completed");
+        }
+      });
+}
+
+function setRowCompleted(wsid, completed) {
+    const row = document.querySelector('tr[data-wsid="' + wsid + '"]');
+    if (!row) return;
+    if (completed) {
+        row.classList.add('completed-row');
+        row.querySelectorAll('select, input, textarea, button').forEach(el => {
+            el.disabled = true;
+        });
+    } else {
+        row.classList.remove('completed-row');
+        row.querySelectorAll('select, input, textarea, button').forEach(el => {
+            el.disabled = false;
+        });
+    }
 }
 
 function toggleClient(clientId) {

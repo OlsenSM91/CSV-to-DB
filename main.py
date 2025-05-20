@@ -22,7 +22,7 @@ templates = Jinja2Templates(directory="templates")
 
 TECHNICIANS = ["Brian", "Ed", "Steven", "Roy", "Jessica"]
 STATUS_LIST = [
-    "- Select Status -", "Assigned", "Ready to Upgrade", "Scheduled", "In Progress",
+    "- Select Status -", "Under Review", "Assigned", "Ready to Upgrade", "Scheduled", "In Progress",
     "Waiting on Product", "Must Quote", "Awaiting Client Response", "Needs RAM Upgrade", "Completed"
 ]
 

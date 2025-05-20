@@ -58,7 +58,18 @@
     </div>
     {% for client in clients %}
         <div class="client-group">
-            <div class="client-header" onclick="toggleClient('{{ client.name|replace(' ', '_') }}')">
+            {# Pre-calculate status counts for this client #}
+            {% set ready_count = client.workstations|selectattr('status', 'equalto', 'Ready to Upgrade')|list|length %}
+            {% set completed_count = client.workstations|selectattr('status', 'equalto', 'Completed')|list|length %}
+            {% set total = client.workstations|length %}
+
+            <div class="client-header
+                {% if total > 0 and completed_count == total %}
+                    completed-company
+                {% elif ready_count > 0 %}
+                    ready-company
+                {% endif %}"
+                onclick="toggleClient('{{ client.name|replace(' ', '_') }}')">
                 <span class="collapse-toggle" id="toggle-{{ client.name|replace(' ', '_') }}">[+]</span>
                 <strong>{{ client.name }}</strong>&nbsp; <span>({{ client.workstations|length }} systems)</span>
                 &nbsp;&nbsp;&nbsp;<button class="import-btn" type="button" onclick="event.stopPropagation(); showAddModal({{ client.id }}, '{{ client.name }}')">+ Add Workstation</button>
@@ -76,13 +87,13 @@
                         <th>Actions</th>
                     </tr>
                     {% for ws in client.workstations %}
-                        <tr data-wsid="{{ ws.id }}">
+                        <tr data-wsid="{{ ws.id }}"{% if ws.status == "Completed" %} class="completed-row"{% endif %}>
                             <td>{{ ws.computer_name }}</td>
                             <td>{{ ws.processor_name }}</td>
                             <td>{{ ws.ram_gb }}GB</td>
                             <td>{{ ws.diskspace_remaining_gb }}GB</td>
                             <td>
-                                <select onchange="updateField({{ ws.id }}, 'status', this.value)">
+                                <select onchange="updateField({{ ws.id }}, 'status', this.value)" {% if ws.status == "Completed" %}disabled{% endif %}>
                                     {% for status in statuses %}
                                         <option value="{{ status }}" {% if ws.status == status %}selected{% endif %}>
                                             {{ status }}
@@ -91,7 +102,7 @@
                                 </select>
                             </td>
                             <td>
-                                <select onchange="updateField({{ ws.id }}, 'technician', this.value)">
+                                <select onchange="updateField({{ ws.id }}, 'technician', this.value)" {% if ws.status == "Completed" %}disabled{% endif %}>
                                     <option value="">- Technician -</option>
                                     {% for tech in technicians %}
                                         <option value="{{ tech }}" {% if ws.technician == tech %}selected{% endif %}>{{ tech }}</option>
@@ -99,7 +110,7 @@
                                 </select>
                             </td>
                             <td>
-                                <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)">
+                                <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)" {% if ws.status == "Completed" %}disabled{% endif %}>
                             </td>
                             <td>
                                 <button class="import-btn" type="button" style="background:#5c51a4;" onclick="showEditModal({{ ws.id }})">Edit</button>

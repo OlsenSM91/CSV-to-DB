@@ -273,3 +273,48 @@ input[type="file"] {
 .close { position: absolute; top: 10px; right: 20px; font-size: 28px; cursor: pointer; }
 .add-btn { margin-left: 15px; padding: 3px 8px; border-radius: 5px; background: #3f51b5; color: #fff; border: none; cursor: pointer; }
 .add-btn:hover { background: #273477; }
+/* Company header grey if any workstation is completed */
+.completed-company {
+    background: #e0e0e0 !important;
+    color: #888 !important;
+    border-color: #bbb !important;
+}
+
+.completed-row {
+    background-color: #e0e0e0 !important;
+    color: #888 !important;
+    opacity: 0.6;
+}
+
+/* Only disable selects, inputs, and textareas (not buttons) */
+.completed-row select,
+.completed-row input,
+.completed-row textarea {
+    pointer-events: none;
+    background-color: #f5f5f5 !important;
+    color: #aaa !important;
+    border-color: #ccc !important;
+}
+
+/* Don't let .completed-row affect buttons in Actions */
+.completed-row button {
+    pointer-events: auto !important;
+    background: initial !important;
+    color: initial !important;
+    border-color: initial !important;
+    opacity: 1 !important;
+}
+
+/* Make sure + Add Workstation button is never affected */
+.client-header .import-btn {
+    pointer-events: auto !important;
+    background: #006aad !important;
+    color: #fff !important;
+    opacity: 1 !important;
+}
+
+.ready-company {
+    background: #b9eabb !important;   /* Soft green */
+    color: #186418 !important;
+    border-color: #186418 !important;
+}

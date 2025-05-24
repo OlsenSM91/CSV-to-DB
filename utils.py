@@ -1,6 +1,7 @@
 import pandas as pd
 from sqlalchemy.orm import Session
 from models import Client, Workstation
+from datetime import datetime
 
 def import_csv_to_db(csv_path, db: Session):
     # Clear existing data
@@ -18,15 +19,37 @@ def import_csv_to_db(csv_path, db: Session):
             client = Client(name=client_name)
             db.add(client)
             db.flush()
+        
+        # Check if this workstation was already completed
+        status = str(row.get("Status", "Pending Upgrade"))
+        completed_at = None
+        if status == "Completed":
+            # If there's a completed date in the CSV, use it
+            if "Completed Date" in df.columns and pd.notna(row.get("Completed Date")):
+                try:
+                    completed_at = datetime.strptime(str(row.get("Completed Date")), "%Y-%m-%d %H:%M")
+                except:
+                    completed_at = datetime.utcnow()
+            else:
+                completed_at = datetime.utcnow()
+        
+        # Check for updated_in_automate field
+        updated_in_automate = False
+        if "Updated in Automate" in df.columns:
+            automate_val = str(row.get("Updated in Automate", "")).lower()
+            updated_in_automate = automate_val in ['yes', 'true', '1']
+        
         ws = Workstation(
             client=client,
             computer_name=str(row.get("Computer Name", "")),
             ram_gb=str(row.get("RAM_GB", "")),
             processor_name=str(row.get("Processor Name", "")),
             diskspace_remaining_gb=str(row.get("DiskSpaceRemaining_GB", "")),
-            status="Pending Upgrade",
-            technician="",
-            notes=""
+            status=status,
+            technician=str(row.get("Technician", "")),
+            notes=str(row.get("Notes", "")),
+            updated_in_automate=updated_in_automate,
+            completed_at=completed_at
         )
         db.add(ws)
     db.commit()
@@ -46,7 +69,9 @@ def export_workstations(workstations, export_type='csv'):
             "DiskSpaceRemaining_GB": ws.diskspace_remaining_gb,
             "Status": ws.status,
             "Technician": ws.technician,
-            "Notes": ws.notes
+            "Notes": ws.notes,
+            "Updated in Automate": "Yes" if ws.updated_in_automate else "No",
+            "Completed Date": ws.completed_at.strftime("%Y-%m-%d %H:%M") if ws.completed_at else ""
         })
     df = pd.DataFrame(data)
     buf = io.BytesIO()

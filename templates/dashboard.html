@@ -12,6 +12,35 @@
         <img src="https://cns4u.com/logo/logo-1024px-lightbg-logo.png" class="logo" alt="CNS Logo">
         <h1>Windows 11 Upgrade Dashboard</h1>
     </div>
+    
+    <!-- Statistics Dashboard -->
+    <div class="stats-container">
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.total }}</div>
+            <div class="stat-label">Total Workstations</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.completed }}</div>
+            <div class="stat-label">Completed</div>
+        </div>
+        <div class="stat-card" style="background: #eafbe8; border-color: #38a169;">
+            <div class="stat-value" style="color: #22863a;">{{ stats.ready_to_upgrade }}</div>
+            <div class="stat-label" style="color: #22863a;">Ready to Upgrade</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.in_progress }}</div>
+            <div class="stat-label">In Progress</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value">{{ stats.not_started }}</div>
+            <div class="stat-label">Not Started</div>
+        </div>
+        <div class="stat-card stat-automate">
+            <div class="stat-value">{{ stats.completed_and_updated }}</div>
+            <div class="stat-label">Updated in Automate</div>
+        </div>
+    </div>
+    
     <div class="filters">
         <span class="filter-wrap">
             <input id="clientFilter" list="clientList" placeholder="Client Name">
@@ -50,12 +79,20 @@
             </datalist>
         </span>
         <span class="filter-wrap">
+            <select id="automateFilter">
+                <option value="">All Automate Status</option>
+                <option value="updated">Updated in Automate</option>
+                <option value="not-updated">Not Updated</option>
+            </select>
+        </span>
+        <span class="filter-wrap">
             <input type="text" id="textSearch" placeholder="Search all fields...">
             <button class="clear-x" id="searchClearX" type="button" title="Clear">&times;</button>
         </span>
         <button id="clearFilters" type="button" class="import-btn">Clear</button>
         <a id="exportBtn" href="#" class="import-btn">Export CSV</a>
     </div>
+    
     {% for client in clients %}
         <div class="client-group">
             {# Pre-calculate status counts for this client #}
@@ -84,10 +121,11 @@
                         <th>Status</th>
                         <th>Technician</th>
                         <th>Notes</th>
+                        <th>Updated in Automate</th>
                         <th>Actions</th>
                     </tr>
                     {% for ws in client.workstations %}
-                        <tr data-wsid="{{ ws.id }}"{% if ws.status == "Completed" %} class="completed-row"{% endif %}>
+                        <tr data-wsid="{{ ws.id }}" data-automate="{{ 'updated' if ws.updated_in_automate else 'not-updated' }}"{% if ws.status == "Completed" %} class="completed-row"{% endif %}>
                             <td>{{ ws.computer_name }}</td>
                             <td>{{ ws.processor_name }}</td>
                             <td>{{ ws.ram_gb }}GB</td>
@@ -112,6 +150,14 @@
                             <td>
                                 <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)" {% if ws.status == "Completed" %}disabled{% endif %}>
                             </td>
+                            <td class="automate-cell">
+                                <input type="checkbox" 
+                                       class="automate-checkbox" 
+                                       id="automate-{{ ws.id }}"
+                                       {% if ws.updated_in_automate %}checked{% endif %}
+                                       {% if ws.status != 'Completed' %}disabled{% endif %}
+                                       onchange="updateAutomateStatus({{ ws.id }}, this.checked)">
+                            </td>
                             <td>
                                 <button class="import-btn" type="button" style="background:#5c51a4;" onclick="showEditModal({{ ws.id }})">Edit</button>
                                 <form method="post" action="/workstations/{{ ws.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this workstation?');">
@@ -124,6 +170,7 @@
             </div>
         </div>
     {% endfor %}
+    
     <!-- Add Workstation Modal -->
     <div id="addModal" class="modal" style="display:none;">
       <div class="modal-content">
@@ -179,6 +226,7 @@
         </form>
       </div>
     </div>
+    
     <div class="import-section">
         <div class="import-title">
             <strong>Replace All Data with CSV Import</strong>

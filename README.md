@@ -1,5 +1,9 @@
 # CSV Filtering App
 
+## Stats Update
+![stats_added](https://github.com/user-attachments/assets/bc338ec2-ac43-45ca-b1bf-569242295ff5)
+
+## Original
 ![win11dash](https://github.com/user-attachments/assets/f1b1e246-8240-4023-9129-1e54b8422929)
 ## CRUD Update
 ![crudUpdate](https://github.com/user-attachments/assets/b19f2c29-bd77-4acc-8d92-f5e3c31e0406)

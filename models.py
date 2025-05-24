@@ -1,6 +1,7 @@
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
+from datetime import datetime
 
 Base = declarative_base()
 
@@ -21,4 +22,9 @@ class Workstation(Base):
     status = Column(String, default='Pending Upgrade')
     technician = Column(String, default='')
     notes = Column(Text, default='')
+    
+    # New fields for Automate tracking
+    updated_in_automate = Column(Boolean, default=False)
+    completed_at = Column(DateTime, nullable=True)
+    
     client = relationship('Client', back_populates='workstations')

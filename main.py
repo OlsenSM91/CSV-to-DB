@@ -8,6 +8,7 @@ from starlette.status import HTTP_303_SEE_OTHER
 import os
 import io
 import csv
+from datetime import datetime
 from models import Base, Client, Workstation
 from utils import import_csv_to_db, export_workstations
 
@@ -22,7 +23,7 @@ templates = Jinja2Templates(directory="templates")
 
 TECHNICIANS = ["Brian", "Ed", "Steven", "Roy", "Jessica"]
 STATUS_LIST = [
-    "- Select Status -", "Under Review", "Assigned", "Ready to Upgrade", "Scheduled", "In Progress",
+    "- Select Status -", "Assigned", "Ready to Upgrade", "Scheduled", "In Progress",
     "Waiting on Product", "Must Quote", "Awaiting Client Response", "Needs RAM Upgrade", "Completed"
 ]
 
@@ -41,9 +42,11 @@ def dashboard(
     technician: str = "",
     status: str = "",
     search: str = "",
+    automate: str = "",
     db=Depends(get_db)
 ):
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
+    
     if client:
         ws_query = ws_query.join(Client).filter(Client.name == client)
     if ram:
@@ -52,6 +55,11 @@ def dashboard(
         ws_query = ws_query.filter(Workstation.technician == technician)
     if status:
         ws_query = ws_query.filter(Workstation.status == status)
+    if automate:
+        if automate == "updated":
+            ws_query = ws_query.filter(Workstation.updated_in_automate == True)
+        elif automate == "not-updated":
+            ws_query = ws_query.filter(Workstation.updated_in_automate == False)
     if search:
         like = f"%{search}%"
         ws_query = ws_query.filter(
@@ -63,12 +71,12 @@ def dashboard(
                 Client.name.ilike(like)
             )
         )
+    
     workstations = ws_query.all()
 
-    # --- NEW GROUPING LOGIC ---
+    # Group by client
     clients = {}
     for ws in workstations:
-        # Key on client id, not just name
         if ws.client:
             cid = ws.client.id
             cname = ws.client.name
@@ -81,9 +89,21 @@ def dashboard(
     clients_list = list(clients.values())
     clients_list.sort(key=lambda c: c["name"])
 
+    # Calculate statistics
+    total_ws = db.query(Workstation).count()
+    completed_ws = db.query(Workstation).filter(Workstation.status == "Completed").count()
+    in_progress_ws = db.query(Workstation).filter(Workstation.status == "In Progress").count()
+    ready_to_upgrade_ws = db.query(Workstation).filter(Workstation.status == "Ready to Upgrade").count()
+    not_started_ws = db.query(Workstation).filter(Workstation.status.in_(["- Select Status -", "Assigned", "Pending Upgrade"])).count()
+    completed_and_updated = db.query(Workstation).filter(
+        Workstation.status == "Completed",
+        Workstation.updated_in_automate == True
+    ).count()
+
     all_clients = [c.name for c in db.query(Client).order_by(Client.name)]
     all_ram = sorted(set(ws.ram_gb for ws in db.query(Workstation) if ws.ram_gb))
     all_clients_objs = db.query(Client).order_by(Client.name).all()
+    
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "clients": clients_list,
@@ -92,6 +112,14 @@ def dashboard(
         "all_clients": all_clients,
         "all_ram": all_ram,
         "all_clients_objs": all_clients_objs,
+        "stats": {
+            "total": total_ws,
+            "completed": completed_ws,
+            "in_progress": in_progress_ws,
+            "not_started": not_started_ws,
+            "ready_to_upgrade": ready_to_upgrade_ws,
+            "completed_and_updated": completed_and_updated
+        }
     })
 
 @app.post("/workstations/add")
@@ -116,6 +144,7 @@ async def add_workstation(
         status=status,
         technician=technician,
         notes=notes,
+        updated_in_automate=False
     )
     db.add(ws)
     db.commit()
@@ -136,6 +165,15 @@ async def edit_workstation(
     ws = db.query(Workstation).filter_by(id=ws_id).first()
     if not ws:
         raise HTTPException(status_code=404, detail="Workstation not found")
+    
+    # Track if status changed to completed
+    if ws.status != "Completed" and status == "Completed":
+        ws.completed_at = datetime.utcnow()
+    elif ws.status == "Completed" and status != "Completed":
+        # If changing from completed to something else, reset the automate checkbox
+        ws.updated_in_automate = False
+        ws.completed_at = None
+    
     ws.computer_name = computer_name
     ws.processor_name = processor_name
     ws.ram_gb = ram_gb
@@ -164,9 +202,11 @@ def export_filtered(
     technician: str = "",
     status: str = "",
     search: str = "",
+    automate: str = "",
     db=Depends(get_db)
 ):
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
+    
     if client:
         ws_query = ws_query.join(Client).filter(Client.name.ilike(f"%{client.strip()}%"))
     if ram:
@@ -175,6 +215,11 @@ def export_filtered(
         ws_query = ws_query.filter(Workstation.technician.ilike(f"%{technician.strip()}%"))
     if status:
         ws_query = ws_query.filter(Workstation.status.ilike(f"%{status.strip()}%"))
+    if automate:
+        if automate == "updated":
+            ws_query = ws_query.filter(Workstation.updated_in_automate == True)
+        elif automate == "not-updated":
+            ws_query = ws_query.filter(Workstation.updated_in_automate == False)
     if search:
         like = f"%{search}%"
         ws_query = ws_query.filter(
@@ -186,6 +231,7 @@ def export_filtered(
                 Client.name.ilike(like)
             )
         )
+    
     workstations = ws_query.all()
 
     output = io.StringIO()
@@ -198,8 +244,11 @@ def export_filtered(
         "Disk Space Remaining (GB)",
         "Status",
         "Technician",
-        "Notes"
+        "Notes",
+        "Updated in Automate",
+        "Completed Date"
     ])
+    
     for ws in workstations:
         writer.writerow([
             ws.client.name if ws.client else "",
@@ -209,10 +258,17 @@ def export_filtered(
             ws.diskspace_remaining_gb,
             ws.status,
             ws.technician,
-            ws.notes
+            ws.notes,
+            "Yes" if ws.updated_in_automate else "No",
+            ws.completed_at.strftime("%Y-%m-%d %H:%M") if ws.completed_at else ""
         ])
+    
     output.seek(0)
-    return StreamingResponse(output, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=workstations.csv"})
+    return StreamingResponse(
+        output, 
+        media_type="text/csv", 
+        headers={"Content-Disposition": "attachment; filename=workstations.csv"}
+    )
 
 @app.post("/update")
 async def update_field(
@@ -224,9 +280,44 @@ async def update_field(
     ws = db.query(Workstation).filter_by(id=id).first()
     if not ws:
         return JSONResponse({"ok": False, "error": "Not found"})
+    
     # Only allow specific fields to be updated
-    if field not in ("status", "technician", "notes"):
+    if field not in ("status", "technician", "notes", "updated_in_automate"):
         return JSONResponse({"ok": False, "error": "Bad field"})
-    setattr(ws, field, value)
+    
+    # Handle status changes
+    if field == "status":
+        if ws.status != "Completed" and value == "Completed":
+            ws.completed_at = datetime.utcnow()
+        elif ws.status == "Completed" and value != "Completed":
+            ws.updated_in_automate = False
+            ws.completed_at = None
+    
+    # Handle automate checkbox
+    if field == "updated_in_automate":
+        ws.updated_in_automate = value.lower() in ['true', '1', 'yes']
+    else:
+        setattr(ws, field, value)
+    
     db.commit()
     return JSONResponse({"ok": True})
+
+@app.post("/import")
+async def import_csv(
+    file: UploadFile = File(...),
+    db=Depends(get_db)
+):
+    # Save uploaded file temporarily
+    temp_path = f"temp_{file.filename}"
+    with open(temp_path, "wb") as buffer:
+        content = await file.read()
+        buffer.write(content)
+    
+    try:
+        import_csv_to_db(temp_path, db)
+        os.remove(temp_path)
+        return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        raise HTTPException(status_code=400, detail=str(e))

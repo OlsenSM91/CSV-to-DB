@@ -29,6 +29,51 @@ body {
     letter-spacing: 1px;
 }
 
+/* Statistics Dashboard */
+.stats-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 0 32px 24px 32px;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    text-align: center;
+    border: 1px solid #e0e6ee;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #0078d4;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
+.stat-automate {
+    background: #e8f5fe;
+    border-color: #0078d4;
+}
+
+.stat-automate .stat-value {
+    color: #004e81;
+}
+
 .filters {
     display: flex;
     flex-wrap: wrap;
@@ -154,8 +199,25 @@ input[type="file"] {
     margin-right: 8px;
 }
 
+/* Automate checkbox styling */
+.automate-cell {
+    text-align: center;
+}
+
+.automate-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    vertical-align: middle;
+}
+
+.automate-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 @media (max-width: 900px) {
-    .filters, .import-form, .client-group {
+    .filters, .import-form, .client-group, .stats-container {
         margin: 0 6px 16px 6px;
     }
     .brand-header {
@@ -167,6 +229,12 @@ input[type="file"] {
     }
     table, th, td {
         font-size: 0.97em;
+    }
+    .stat-card {
+        padding: 1rem;
+    }
+    .stat-value {
+        font-size: 2rem;
     }
 }
 
@@ -288,12 +356,18 @@ input[type="file"] {
 
 /* Only disable selects, inputs, and textareas (not buttons) */
 .completed-row select,
-.completed-row input,
+.completed-row input[type="text"],
 .completed-row textarea {
     pointer-events: none;
     background-color: #f5f5f5 !important;
     color: #aaa !important;
     border-color: #ccc !important;
+}
+
+/* Don't disable the automate checkbox even on completed rows */
+.completed-row .automate-checkbox:enabled {
+    pointer-events: auto !important;
+    opacity: 1 !important;
 }
 
 /* Don't let .completed-row affect buttons in Actions */

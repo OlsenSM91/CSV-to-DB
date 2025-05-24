@@ -7,6 +7,38 @@ function updateField(id, field, value) {
         // If the updated field is status, update the row styling/locking
         if (field === "status") {
             setRowCompleted(id, value === "Completed");
+            // Enable/disable the automate checkbox based on status
+            const automateCheckbox = document.getElementById(`automate-${id}`);
+            if (automateCheckbox) {
+                if (value === "Completed") {
+                    automateCheckbox.disabled = false;
+                } else {
+                    automateCheckbox.disabled = true;
+                    automateCheckbox.checked = false;
+                    // Also update the automate status to false
+                    updateAutomateStatus(id, false);
+                }
+            }
+        }
+      });
+}
+
+function updateAutomateStatus(id, checked) {
+    fetch("/update", {
+        method: "POST",
+        body: new URLSearchParams({ 
+            id: id, 
+            field: 'updated_in_automate', 
+            value: checked 
+        })
+    }).then(res => res.json())
+      .then(data => {
+        if (data.ok) {
+            // Update the data attribute for filtering
+            const row = document.querySelector(`tr[data-wsid="${id}"]`);
+            if (row) {
+                row.setAttribute('data-automate', checked ? 'updated' : 'not-updated');
+            }
         }
       });
 }
@@ -16,12 +48,13 @@ function setRowCompleted(wsid, completed) {
     if (!row) return;
     if (completed) {
         row.classList.add('completed-row');
-        row.querySelectorAll('select, input, textarea, button').forEach(el => {
+        // Disable all inputs except the automate checkbox and buttons
+        row.querySelectorAll('select, input[type="text"], textarea').forEach(el => {
             el.disabled = true;
         });
     } else {
         row.classList.remove('completed-row');
-        row.querySelectorAll('select, input, textarea, button').forEach(el => {
+        row.querySelectorAll('select, input[type="text"], textarea').forEach(el => {
             el.disabled = false;
         });
     }
@@ -46,7 +79,8 @@ function getFilters() {
         ram: document.getElementById('ramFilter').value.trim().toLowerCase(),
         technician: document.getElementById('technicianFilter').value.trim().toLowerCase(),
         status: document.getElementById('statusFilter').value.trim().toLowerCase(),
-        search: document.getElementById('textSearch').value.trim().toLowerCase()
+        search: document.getElementById('textSearch').value.trim().toLowerCase(),
+        automate: document.getElementById('automateFilter').value
     };
 }
 
@@ -57,7 +91,8 @@ function filterTable() {
         filters.ram ||
         filters.technician ||
         filters.status ||
-        filters.search
+        filters.search ||
+        filters.automate
     );
 
     document.querySelectorAll('.client-group').forEach(group => {
@@ -74,6 +109,7 @@ function filterTable() {
             let status = cells[4].querySelector('select').value.trim().toLowerCase();
             let technician = cells[5].querySelector('select').value.trim().toLowerCase();
             let notes = cells[6].querySelector('input').value.trim().toLowerCase();
+            let automateStatus = row.getAttribute('data-automate');
 
             let show = true;
             // Partial, case-insensitive matching for all filters
@@ -81,6 +117,7 @@ function filterTable() {
             if (filters.ram && !ram.includes(filters.ram)) show = false;
             if (filters.technician && !technician.includes(filters.technician)) show = false;
             if (filters.status && !status.includes(filters.status)) show = false;
+            if (filters.automate && automateStatus !== filters.automate) show = false;
             if (filters.search && !(
                 computer.includes(filters.search) ||
                 processor.includes(filters.search) ||
@@ -138,10 +175,10 @@ function setupClearXs() {
 
 window.onload = function () {
     // Set up instant filter listeners
-    ['clientFilter', 'ramFilter', 'technicianFilter', 'statusFilter', 'textSearch'].forEach(id => {
+    ['clientFilter', 'ramFilter', 'technicianFilter', 'statusFilter', 'textSearch', 'automateFilter'].forEach(id => {
         let el = document.getElementById(id);
         if (el) {
-            el.addEventListener('input', filterTable);
+            el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', filterTable);
         }
     });
 
@@ -155,6 +192,7 @@ window.onload = function () {
                 let el = document.getElementById(id);
                 if (el) el.value = '';
             });
+            document.getElementById('automateFilter').value = '';
             filterTable();
             setupClearXs();
         });
@@ -215,3 +253,6 @@ window.closeModal = closeModal;
 document.addEventListener('click', function(e) {
     if (e.target.classList && e.target.classList.contains('modal')) closeModal(e.target.id);
 });
+
+// Make updateAutomateStatus available globally
+window.updateAutomateStatus = updateAutomateStatus;

@@ -1,8 +1,14 @@
 fastapi
 uvicorn
-jinja2
 sqlalchemy
-aiofiles
 pandas
 openpyxl
 python-multipart
+requests
+pydantic
+jinja2
+python-dotenv
+httpx
+fuzzywuzzy
+python-Levenshtein
+pyconnectwise

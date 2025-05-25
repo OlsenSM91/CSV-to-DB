@@ -20,6 +20,8 @@ function updateField(id, field, value) {
                 }
             }
         }
+        // Check if we need to show/hide the project ticket button
+        checkProjectTicketReadiness();
       });
 }
 
@@ -173,6 +175,96 @@ function setupClearXs() {
     });
 }
 
+// Create Project Ticket function
+function createProjectTicket(clientId, clientName) {
+    if (!confirm(`Create a ConnectWise project ticket for "${clientName}" Windows 11 upgrades?`)) {
+        return;
+    }
+    
+    // Show loading state
+    const btn = event.target;
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = 'Creating...';
+    
+    fetch(`/create-project-ticket/${clientId}`, {
+        method: 'POST'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(`Project ticket #${data.ticket_id} created successfully for ${data.cw_company_name}!`);
+            // Hide the button after successful creation
+            btn.style.display = 'none';
+        } else {
+            alert(`Failed to create ticket: ${data.error}`);
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
+    })
+    .catch(err => {
+        alert(`Error creating ticket: ${err}`);
+        btn.disabled = false;
+        btn.innerText = originalText;
+    });
+}
+
+// Check project ticket readiness for all clients
+function checkProjectTicketReadiness() {
+    document.querySelectorAll('.client-group').forEach(group => {
+        const clientHeader = group.querySelector('.client-header');
+        const clientId = clientHeader.querySelector('button[onclick*="showAddModal"]')
+            ?.getAttribute('onclick')
+            ?.match(/showAddModal\((\d+)/)?.[1];
+        
+        if (!clientId) return;
+        
+        // Check all workstations in this client
+        const rows = group.querySelectorAll('table tr:not(:first-child)');
+        let allReady = rows.length > 0;
+        
+        rows.forEach(row => {
+            const statusSelect = row.querySelector('td:nth-child(5) select');
+            const techSelect = row.querySelector('td:nth-child(6) select');
+            
+            if (!statusSelect || !techSelect) {
+                allReady = false;
+                return;
+            }
+            
+            const status = statusSelect.value;
+            const tech = techSelect.value;
+            
+            if (!status || status === '- Select Status -' || !tech || tech === '') {
+                allReady = false;
+            }
+        });
+        
+        // Show/hide the project ticket button
+        let projectBtn = clientHeader.querySelector('.project-ticket-btn');
+        if (allReady && !projectBtn) {
+            // Add the button
+            const addBtn = clientHeader.querySelector('button[onclick*="showAddModal"]');
+            if (addBtn) {
+                const newBtn = document.createElement('button');
+                newBtn.className = 'import-btn project-ticket-btn';
+                newBtn.type = 'button';
+                newBtn.innerText = 'Create Project Ticket';
+                newBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const clientName = clientHeader.querySelector('strong').textContent;
+                    createProjectTicket(clientId, clientName);
+                };
+                addBtn.parentNode.insertBefore(newBtn, addBtn.nextSibling);
+                addBtn.parentNode.insertBefore(document.createTextNode(' '), addBtn.nextSibling);
+            }
+        } else if (!allReady && projectBtn) {
+            // Remove the button
+            projectBtn.remove();
+        }
+    });
+}
+
 window.onload = function () {
     // Set up instant filter listeners
     ['clientFilter', 'ramFilter', 'technicianFilter', 'statusFilter', 'textSearch', 'automateFilter'].forEach(id => {
@@ -184,6 +276,7 @@ window.onload = function () {
 
     setupClearXs();
     filterTable();
+    checkProjectTicketReadiness();
 
     let clearBtn = document.getElementById('clearFilters');
     if (clearBtn) {
@@ -254,5 +347,7 @@ document.addEventListener('click', function(e) {
     if (e.target.classList && e.target.classList.contains('modal')) closeModal(e.target.id);
 });
 
-// Make updateAutomateStatus available globally
+// Make functions available globally
 window.updateAutomateStatus = updateAutomateStatus;
+window.createProjectTicket = createProjectTicket;
+window.checkProjectTicketReadiness = checkProjectTicketReadiness;

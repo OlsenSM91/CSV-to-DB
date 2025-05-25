@@ -11,6 +11,7 @@ import csv
 from datetime import datetime
 from models import Base, Client, Workstation
 from utils import import_csv_to_db, export_workstations
+from connectwise_api import find_company_by_name, create_project_ticket, check_company_workstations_ready
 
 DB_PATH = 'sqlite:///./database.db'
 engine = create_engine(DB_PATH, connect_args={"check_same_thread": False})
@@ -74,7 +75,7 @@ def dashboard(
     
     workstations = ws_query.all()
 
-    # Group by client
+    # Group by client and check readiness for project ticket
     clients = {}
     for ws in workstations:
         if ws.client:
@@ -86,6 +87,23 @@ def dashboard(
         if cid not in clients:
             clients[cid] = {"id": cid, "name": cname, "workstations": []}
         clients[cid]["workstations"].append(ws)
+    
+    # Check if each client is ready for project ticket
+    for client_data in clients.values():
+        ws_dicts = [
+            {
+                "computer_name": ws.computer_name,
+                "processor_name": ws.processor_name,
+                "ram_gb": ws.ram_gb,
+                "diskspace_remaining_gb": ws.diskspace_remaining_gb,
+                "status": ws.status,
+                "technician": ws.technician,
+                "notes": ws.notes
+            }
+            for ws in client_data["workstations"]
+        ]
+        client_data["ready_for_ticket"] = check_company_workstations_ready(ws_dicts)
+    
     clients_list = list(clients.values())
     clients_list.sort(key=lambda c: c["name"])
 
@@ -321,3 +339,84 @@ async def import_csv(
         if os.path.exists(temp_path):
             os.remove(temp_path)
         raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/create-project-ticket/{client_id}")
+async def create_project_ticket_endpoint(
+    client_id: int,
+    db=Depends(get_db)
+):
+    """Create a ConnectWise project ticket for Windows 11 upgrades."""
+    # Get the client
+    client = db.query(Client).filter_by(id=client_id).first()
+    if not client:
+        return JSONResponse({"success": False, "error": "Client not found"}, status_code=404)
+    
+    # Get all workstations for this client
+    workstations = db.query(Workstation).filter_by(client_id=client_id).all()
+    
+    # Convert to dict format for the API
+    ws_data = [
+        {
+            "computer_name": ws.computer_name,
+            "processor_name": ws.processor_name,
+            "ram_gb": ws.ram_gb,
+            "diskspace_remaining_gb": ws.diskspace_remaining_gb,
+            "status": ws.status,
+            "technician": ws.technician,
+            "notes": ws.notes
+        }
+        for ws in workstations
+    ]
+    
+    # Check if ready (all have status and technician)
+    if not check_company_workstations_ready(ws_data):
+        return JSONResponse({
+            "success": False, 
+            "error": "All workstations must have a status and technician assigned"
+        }, status_code=400)
+    
+    # Find the company in ConnectWise
+    cw_company = await find_company_by_name(client.name)
+    if not cw_company:
+        return JSONResponse({
+            "success": False,
+            "error": f"Could not find company '{client.name}' in ConnectWise"
+        }, status_code=404)
+    
+    # Create the ticket
+    success, ticket_id, message = await create_project_ticket(
+        company_id=cw_company['id'],
+        workstations=ws_data
+    )
+    
+    if success:
+        return JSONResponse({
+            "success": True,
+            "ticket_id": ticket_id,
+            "message": message,
+            "cw_company_name": cw_company['name']
+        })
+    else:
+        return JSONResponse({
+            "success": False,
+            "error": message
+        }, status_code=500)
+
+@app.get("/check-ticket-readiness/{client_id}")
+async def check_ticket_readiness(
+    client_id: int,
+    db=Depends(get_db)
+):
+    """Check if a client is ready for project ticket creation."""
+    workstations = db.query(Workstation).filter_by(client_id=client_id).all()
+    
+    ws_data = [
+        {
+            "status": ws.status,
+            "technician": ws.technician
+        }
+        for ws in workstations
+    ]
+    
+    ready = check_company_workstations_ready(ws_data)
+    return JSONResponse({"ready": ready})

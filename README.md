@@ -1,75 +1,117 @@
-# CSV Filtering App
+Certainly! Here’s an **overhauled, modernized README** for your app, reflecting the new features and ConnectWise ticket integration. This version is cleaner, less repetitive, and focuses on your actual value.
 
-## Stats Update
-![stats_added](https://github.com/user-attachments/assets/bc338ec2-ac43-45ca-b1bf-569242295ff5)
+---
 
-## Original
-![win11dash](https://github.com/user-attachments/assets/f1b1e246-8240-4023-9129-1e54b8422929)
-## CRUD Update
-![crudUpdate](https://github.com/user-attachments/assets/b19f2c29-bd77-4acc-8d92-f5e3c31e0406)
-## Color-Way Update
-![GreenMeansTheresWorkstationsThatNeedToBeScheduledThatAreReadyForUpgrade](https://github.com/user-attachments/assets/ed31e7f9-9206-4510-8ece-1709c3774eba)
+# CNS Asset Dashboard
 
-A simple, open-source dashboard for managing, filtering, and tracking bulk assets or projects based on CSV data. Originally built for planning and scheduling Windows 11 workstation upgrades at Computer Networking Solutions, Inc. (CNS), this app can be repurposed for any scenario where you need to view, search, filter, update, and export CSV-based lists.
+![stats\_added](https://github.com/user-attachments/assets/bc338ec2-ac43-45ca-b1bf-569242295ff5)
+![projectTicket](https://github.com/user-attachments/assets/069dc1cb-b7db-4c81-a6cf-d8c94dd31766)
 
-## Features
+A modern, open-source web dashboard for managing and scheduling workstation or asset upgrades in bulk. Originally built for Windows 11 upgrade planning at Computer Networking Solutions, Inc. (CNS), this tool now supports advanced tracking, CSV import/export, real-time status editing, and direct integration with ConnectWise for ticket automation.
 
-- CSV import: Upload a CSV to initialize or replace the database.
-- Instant search and filter by any field.
-- Grouping by a key column (e.g., "Client Name") with collapsible/expandable groups.
-- In-place editing for select fields (e.g., status, technician, notes).
-- Export filtered view to CSV.
-- Responsive, modern interface.
-- Edit/Delete/Add New workstations to clients
+---
 
-## Getting Started
+## Key Features
 
-1. Install requirements:
-   `pip install -r requirements.txt`
+* **CSV Import/Replace:** Upload a CSV file to initialize or reset all data.
+* **Instant, Multi-Field Filtering:** Instantly search and filter workstations by client, RAM, technician, status, or any other field. Filtered results are always live and exportable.
+* **Group & Collapse by Client:** Workstations are grouped by client/company with collapsible sections for easier navigation.
+* **In-Place, Live Editing:** Change statuses, technician assignments, or notes inline—changes are instantly saved.
+* **Workstation CRUD:** Add, edit, or remove workstations directly from the dashboard.
+* **Export Filtered Results:** Download your currently filtered view as a CSV for reporting or further processing.
+* **Upgrade Status Overview:** See real-time statistics for all workstations (including “Ready to Upgrade,” “Completed,” “Not Started,” and more).
+* **ConnectWise Ticketing Integration:**
 
-2. Run the app:
-   `uvicorn main:app --reload`
+  * Automatically enable the “Create Ticket” button only when all company workstations are properly assigned and updated.
+  * Seamlessly create a grouped ConnectWise service ticket for eligible companies—pre-filled with upgrade details and technician assignments.
 
-   Or specify port/host (for example, to use port 1337):
-   `uvicorn main:app --reload --port 1337 --host 0.0.0.0`
+---
 
-3. Open your browser to:
-   `http://localhost:8000  (or your chosen port/host)`
+## Quick Start
 
-## Usage
+1. **Install dependencies:**
 
-- Import a CSV via the form at the bottom of the dashboard (this wipes and replaces all data).
-- Use filter boxes at the top to instantly filter/search. Use the "×" to clear individual filters or "Clear" to reset all.
-- Update statuses, technicians, or notes directly in the table; changes are saved instantly.
-- Click "Export CSV" to download the currently filtered dataset.
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+2. **Configure ConnectWise Integration:**
+   Create a `.env` file in your project directory:
+
+   ```
+   CW_BASE_URL=https://yourinstance.connectwise.com/v4_6_release/apis/3.0
+   CW_COMPANY_ID=YOURCOMPANYID
+   CW_CLIENT_ID=YOUR_CLIENT_ID
+   CW_PUBLIC_API_KEY=YOUR_PUBLIC_KEY
+   CW_PRIVATE_API_KEY=YOUR_PRIVATE_KEY
+   ```
+
+   *(Contact your ConnectWise admin for API credentials if needed.)*
+
+3. **Run the app:**
+
+   ```bash
+   uvicorn main:app --reload
+   ```
+
+   Or specify a custom port/host if needed.
+
+4. **Open in your browser:**
+
+   ```
+   http://localhost:8000
+   ```
+
+   (or your chosen host/port)
+
+---
+
+## Usage Overview
+
+* **Import Data:** Upload your CSV at the bottom of the dashboard to (re)populate the app.
+* **Filter/Search:** Use the multi-field filters at the top for instant narrowing by client, RAM, technician, status, and more. Filters are stackable.
+* **Edit Inline:** Click directly on fields like status or technician to change them—no extra forms needed.
+* **Add/Remove Workstations:** Use the buttons in each group to quickly edit or add new systems.
+* **Export Data:** Download your current filtered view with one click—great for reporting or off-line work.
+* **Create Project Ticket (ConnectWise):**
+
+  * When all workstations for a company are ready (i.e., each has a technician and status), a “Create Project Ticket” button appears for that group.
+  * Clicking this button sends a grouped, detailed ticket to ConnectWise under the appropriate service board, with summary, description, assigned technicians, and more.
+
+---
 
 ## CSV Format
 
-Your CSV should contain headers in the first row.
-For the default Windows 11 upgrade case, the columns expected are:
+Your input CSV should have headers as the first row, such as:
 
-  `Client Name, Computer Name, RAM_GB, Processor Name, DiskSpaceRemaining_GB`
+```
+Client Name,Computer Name,RAM_GB,Processor Name,DiskSpaceRemaining_GB,Status,Technician,Notes
+Acme,PC-001,16,Intel i7-8700,512,Ready to Upgrade,Steven,Customer approved
+```
 
-You can adapt the column names/logic for your own scenario.
+Additional columns can be added; required columns may depend on your deployment.
 
-Example:
-`Client Name,Computer Name,RAM_GB,Processor Name,DiskSpaceRemaining_GB
-Acme,PC-001,16,Intel i7-8700,512
-Fabrikam,PC-002,8,Intel i5-8500,128`
+---
 
-## Customization
+## Customization & Extensibility
 
-- To adjust grouping or fields, edit `models.py`, `utils.py`, and the dashboard Jinja2 template.
-- The default technician and status lists are in `main.py`.
+* **Field Logic:** Adjust grouping or field logic in `models.py`, `utils.py`, and `dashboard.html` (Jinja2).
+* **Technician/Status Lists:** Update valid lists in `main.py`.
+* **ConnectWise Integration:** Edit board/type/team defaults in `connectwise_api.py` if you have multiple boards or types.
+* **Permissions:** For ConnectWise features, API credentials must have sufficient permissions for ticket creation and member/team lookups.
+
+---
 
 ## License
 
-Open-source. Free for personal or commercial use. No warranty is provided.
+Open-source. Free for business or personal use. No warranty provided.
 
-## Acknowledgments
+---
 
-Originally developed by Steven for Computer Networking Solutions, Inc. (CNS) for internal Windows 11 upgrade project management.
+## Credits
 
-## Support
+Developed by Steven Olsen for Computer Networking Solutions, Inc. (CNS). Released for public use and IT community benefit.
 
-Community support only. Please open an issue or submit a pull request for improvements.
+---
+
+**Contributions welcome!** Open an issue or submit a PR with improvements or fixes.

@@ -84,3 +84,16 @@ def export_workstations(workstations, export_type='csv'):
         buf.seek(0)
         return buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'export.xlsx'
     return None, None, None
+
+def check_company_workstations_ready(workstations):
+    """
+    Returns True only if every workstation:
+      - Has a technician assigned (not None or blank)
+      - Has a status that is not "- Select Status -" or "Assigned"
+    """
+    for ws in workstations:
+        if not ws.get("technician") or ws["technician"].strip() == "":
+            return False
+        if ws.get("status") in ["- Select Status -", "Assigned", None, ""]:
+            return False
+    return True

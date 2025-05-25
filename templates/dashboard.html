@@ -110,6 +110,9 @@
                 <span class="collapse-toggle" id="toggle-{{ client.name|replace(' ', '_') }}">[+]</span>
                 <strong>{{ client.name }}</strong>&nbsp; <span>({{ client.workstations|length }} systems)</span>
                 &nbsp;&nbsp;&nbsp;<button class="import-btn" type="button" onclick="event.stopPropagation(); showAddModal({{ client.id }}, '{{ client.name }}')">+ Add Workstation</button>
+                {% if client.ready_for_ticket %}
+                &nbsp;<button class="import-btn project-ticket-btn" type="button" onclick="event.stopPropagation(); createProjectTicket({{ client.id }}, '{{ client.name }}')">Create Project Ticket</button>
+                {% endif %}
             </div>
             <div id="client-{{ client.name|replace(' ', '_') }}" class="workstations" style="display: none;">
                 <table>

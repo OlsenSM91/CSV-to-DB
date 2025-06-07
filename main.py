@@ -131,17 +131,6 @@ def build_dashboard_context(
 
     clients_list = list(clients.values())
     clients_list.sort(key=lambda c: c["name"])
-
-    total_ws = db.query(Workstation).count()
-    completed_ws = db.query(Workstation).filter(Workstation.status == "Completed").count()
-    in_progress_ws = db.query(Workstation).filter(Workstation.status == "In Progress").count()
-    ready_to_upgrade_ws = db.query(Workstation).filter(Workstation.status == "Ready to Upgrade").count()
-    not_started_ws = db.query(Workstation).filter(Workstation.status.in_(["- Select Status -", "Assigned", "Pending Upgrade"])).count()
-    completed_and_updated = db.query(Workstation).filter(
-        Workstation.status == "Completed",
-        Workstation.updated_in_automate == True
-    ).count()
-
     all_clients = [c.name for c in db.query(Client).order_by(Client.name)]
     all_ram = sorted(set(ws.ram_gb for ws in db.query(Workstation) if ws.ram_gb))
     all_clients_objs = db.query(Client).order_by(Client.name).all()
@@ -154,14 +143,6 @@ def build_dashboard_context(
         "all_clients": all_clients,
         "all_ram": all_ram,
         "all_clients_objs": all_clients_objs,
-        "stats": {
-            "total": total_ws,
-            "completed": completed_ws,
-            "in_progress": in_progress_ws,
-            "not_started": not_started_ws,
-            "ready_to_upgrade": ready_to_upgrade_ws,
-            "completed_and_updated": completed_and_updated,
-        },
     }
 
 @app.get("/", response_class=HTMLResponse)
@@ -400,7 +381,6 @@ async def update_field(
         setattr(ws, field, value)
 
     db.commit()
-    await manager.broadcast({"action": "field_update", "id": ws.id, "field": field, "value": getattr(ws, field)})
     return JSONResponse({"ok": True})
 
 @app.post("/import")

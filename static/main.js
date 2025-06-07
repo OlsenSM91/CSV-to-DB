@@ -1,26 +1,41 @@
+function applyFieldUpdate(id, field, value) {
+    const row = document.querySelector(`tr[data-wsid="${id}"]`);
+    if (!row) return;
+    if (field === "status") {
+        const select = row.querySelector('td:nth-child(5) select');
+        if (select) select.value = value;
+        setRowCompleted(id, value === "Completed");
+        const automateCheckbox = document.getElementById(`automate-${id}`);
+        if (automateCheckbox) {
+            if (value === "Completed") {
+                automateCheckbox.disabled = false;
+            } else {
+                automateCheckbox.disabled = true;
+                automateCheckbox.checked = false;
+            }
+        }
+    } else if (field === "technician") {
+        const select = row.querySelector('td:nth-child(6) select');
+        if (select) select.value = value;
+    } else if (field === "notes") {
+        const input = row.querySelector('td:nth-child(7) input');
+        if (input) input.value = value;
+    } else if (field === "updated_in_automate") {
+        const checkbox = document.getElementById(`automate-${id}`);
+        if (checkbox) {
+            checkbox.checked = !!value;
+            row.setAttribute('data-automate', value ? 'updated' : 'not-updated');
+        }
+    }
+}
+
 function updateField(id, field, value) {
     fetch("/update", {
         method: "POST",
         body: new URLSearchParams({ id, field, value })
     }).then(res => res.json())
       .then(data => {
-        // If the updated field is status, update the row styling/locking
-        if (field === "status") {
-            setRowCompleted(id, value === "Completed");
-            // Enable/disable the automate checkbox based on status
-            const automateCheckbox = document.getElementById(`automate-${id}`);
-            if (automateCheckbox) {
-                if (value === "Completed") {
-                    automateCheckbox.disabled = false;
-                } else {
-                    automateCheckbox.disabled = true;
-                    automateCheckbox.checked = false;
-                    // Also update the automate status to false
-                    updateAutomateStatus(id, false);
-                }
-            }
-        }
-        // Check if we need to show/hide the project ticket button
+        applyFieldUpdate(id, field, value);
         checkProjectTicketReadiness();
       });
 }
@@ -28,10 +43,10 @@ function updateField(id, field, value) {
 function updateAutomateStatus(id, checked) {
     fetch("/update", {
         method: "POST",
-        body: new URLSearchParams({ 
-            id: id, 
-            field: 'updated_in_automate', 
-            value: checked 
+        body: new URLSearchParams({
+            id: id,
+            field: 'updated_in_automate',
+            value: checked
         })
     }).then(res => res.json())
       .then(data => {
@@ -43,6 +58,55 @@ function updateAutomateStatus(id, checked) {
             }
         }
       });
+}
+
+// --- WebSocket setup for real-time updates ---
+const wsProtocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+const socket = new WebSocket(wsProtocol + '://' + window.location.host + '/ws');
+
+socket.addEventListener('message', function(event) {
+    try {
+        const data = JSON.parse(event.data);
+        if (data.action === 'field_update') {
+            applyFieldUpdate(data.id, data.field, data.value);
+            checkProjectTicketReadiness();
+        } else if (data.action === 'refresh') {
+            refreshDashboard();
+        }
+    } catch (e) {
+        console.error('Bad WS message', e);
+    }
+});
+
+function refreshDashboard() {
+    const filters = getFilters();
+    const q = Object.entries(filters)
+        .filter(([k,v]) => v)
+        .map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+        .join('&');
+    fetch('/fragment?' + q)
+        .then(res => res.text())
+        .then(html => {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = html;
+            const newStats = tmp.querySelector('.stats-container');
+            const oldStats = document.querySelector('.stats-container');
+            if (newStats && oldStats) oldStats.innerHTML = newStats.innerHTML;
+            ['clientList','ramList','technicianList','statusList'].forEach(id => {
+                const newList = tmp.querySelector(`#${id}`);
+                const oldList = document.querySelector(`#${id}`);
+                if (newList && oldList) oldList.innerHTML = newList.innerHTML;
+            });
+            const newGroups = tmp.querySelector('#clientGroups');
+            const oldGroups = document.getElementById('clientGroups');
+        if (newGroups && oldGroups) {
+            oldGroups.innerHTML = newGroups.innerHTML;
+        }
+        setupDeleteForms();
+        setupSorting();
+        checkProjectTicketReadiness();
+        filterTable();
+    });
 }
 
 function setRowCompleted(wsid, completed) {
@@ -265,6 +329,80 @@ function checkProjectTicketReadiness() {
     });
 }
 
+function setupDeleteForms() {
+    document.querySelectorAll('form[action$="/delete"]').forEach(form => {
+        if (form.dataset.ajax) return;
+        form.dataset.ajax = '1';
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            if (!confirm('Delete this workstation?')) return;
+            fetch(form.action, {
+                method: 'POST',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(() => refreshDashboard());
+        });
+    });
+}
+
+function setupAddEditForms() {
+    const addForm = document.getElementById('addForm');
+    if (addForm) {
+        addForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(addForm.action, {
+                method: 'POST',
+                body: new FormData(addForm),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(() => { closeModal('addModal'); refreshDashboard(); });
+        });
+    }
+    const editForm = document.getElementById('editForm');
+    if (editForm) {
+        editForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            fetch(editForm.action, {
+                method: 'POST',
+                body: new FormData(editForm),
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            }).then(() => { closeModal('editModal'); refreshDashboard(); });
+        });
+    }
+}
+
+function sortTable(table, colIndex, type, asc) {
+    const rows = Array.from(table.querySelectorAll('tr')).slice(1);
+    rows.sort((a, b) => {
+        let aVal = a.children[colIndex].textContent.trim();
+        let bVal = b.children[colIndex].textContent.trim();
+        if (type === 'number') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        if (aVal < bVal) return asc ? -1 : 1;
+        if (aVal > bVal) return asc ? 1 : -1;
+        return 0;
+    });
+    rows.forEach(row => table.appendChild(row));
+}
+
+function setupSorting() {
+    document.querySelectorAll('.client-group table th').forEach(th => {
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', function() {
+            const table = th.closest('table');
+            const index = Array.prototype.indexOf.call(th.parentNode.children, th);
+            const type = th.dataset.type || 'string';
+            const asc = !(table.dataset.sortCol == index && table.dataset.sortDir === 'asc');
+            sortTable(table, index, type, asc);
+            table.dataset.sortCol = index;
+            table.dataset.sortDir = asc ? 'asc' : 'desc';
+        });
+    });
+}
+
 window.onload = function () {
     // Set up instant filter listeners
     ['clientFilter', 'ramFilter', 'technicianFilter', 'statusFilter', 'textSearch', 'automateFilter'].forEach(id => {
@@ -277,6 +415,9 @@ window.onload = function () {
     setupClearXs();
     filterTable();
     checkProjectTicketReadiness();
+    setupDeleteForms();
+    setupAddEditForms();
+    setupSorting();
 
     let clearBtn = document.getElementById('clearFilters');
     if (clearBtn) {

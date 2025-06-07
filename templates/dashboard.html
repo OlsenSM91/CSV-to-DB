@@ -93,6 +93,7 @@
         <a id="exportBtn" href="#" class="import-btn">Export CSV</a>
     </div>
     
+    <div id="clientGroups">
     {% for client in clients %}
         <div class="client-group">
             {# Pre-calculate status counts for this client #}
@@ -119,8 +120,8 @@
                     <tr>
                         <th>Computer Name</th>
                         <th>Processor</th>
-                        <th>RAM</th>
-                        <th>Remaining Disk</th>
+                        <th data-type="number">RAM</th>
+                        <th data-type="number">Remaining Disk</th>
                         <th>Status</th>
                         <th>Technician</th>
                         <th>Notes</th>
@@ -163,7 +164,7 @@
                             </td>
                             <td>
                                 <button class="import-btn" type="button" style="background:#5c51a4;" onclick="showEditModal({{ ws.id }})">Edit</button>
-                                <form method="post" action="/workstations/{{ ws.id }}/delete" style="display:inline;" onsubmit="return confirm('Delete this workstation?');">
+                                <form method="post" action="/workstations/{{ ws.id }}/delete" style="display:inline;" class="delete-form">
                                     <button type="submit" class="import-btn" style="background:#bb3f3f;">Delete</button>
                                 </form>
                             </td>
@@ -173,6 +174,7 @@
             </div>
         </div>
     {% endfor %}
+    </div>
     
     <!-- Add Workstation Modal -->
     <div id="addModal" class="modal" style="display:none;">

@@ -1,0 +1,146 @@
+<div class="stats-container">
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-label">Total Workstations</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.completed }}</div>
+        <div class="stat-label">Completed</div>
+    </div>
+    <div class="stat-card" style="background: #eafbe8; border-color: #38a169;">
+        <div class="stat-value" style="color: #22863a;">{{ stats.ready_to_upgrade }}</div>
+        <div class="stat-label" style="color: #22863a;">Ready to Upgrade</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.in_progress }}</div>
+        <div class="stat-label">In Progress</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value">{{ stats.not_started }}</div>
+        <div class="stat-label">Not Started</div>
+    </div>
+    <div class="stat-card stat-automate">
+        <div class="stat-value">{{ stats.completed_and_updated }}</div>
+        <div class="stat-label">Updated in Automate</div>
+    </div>
+</div>
+
+<div class="filters">
+    <span class="filter-wrap">
+        <input id="clientFilter" list="clientList" placeholder="Client Name">
+        <button class="clear-x" id="clientClearX" type="button" title="Clear">&times;</button>
+        <datalist id="clientList">
+            {% for c in all_clients %}
+                <option value="{{c}}">
+            {% endfor %}
+        </datalist>
+    </span>
+    <span class="filter-wrap">
+        <input id="ramFilter" list="ramList" placeholder="RAM">
+        <button class="clear-x" id="ramClearX" type="button" title="Clear">&times;</button>
+        <datalist id="ramList">
+            {% for r in all_ram %}
+                <option value="{{r}}">
+            {% endfor %}
+        </datalist>
+    </span>
+    <span class="filter-wrap">
+        <input id="technicianFilter" list="technicianList" placeholder="Technician">
+        <button class="clear-x" id="technicianClearX" type="button" title="Clear">&times;</button>
+        <datalist id="technicianList">
+            {% for t in technicians %}
+                <option value="{{t}}">
+            {% endfor %}
+        </datalist>
+    </span>
+    <span class="filter-wrap">
+        <input id="statusFilter" list="statusList" placeholder="Status">
+        <button class="clear-x" id="statusClearX" type="button" title="Clear">&times;</button>
+        <datalist id="statusList">
+            {% for s in statuses %}
+                <option value="{{s}}">
+            {% endfor %}
+        </datalist>
+    </span>
+    <span class="filter-wrap">
+        <select id="automateFilter">
+            <option value="">All Automate Status</option>
+            <option value="updated">Updated in Automate</option>
+            <option value="not-updated">Not Updated</option>
+        </select>
+    </span>
+    <span class="filter-wrap">
+        <input type="text" id="textSearch" placeholder="Search all fields...">
+        <button class="clear-x" id="searchClearX" type="button" title="Clear">&times;</button>
+    </span>
+    <button id="clearFilters" type="button" class="import-btn">Clear</button>
+    <a id="exportBtn" href="#" class="import-btn">Export CSV</a>
+</div>
+
+<div id="clientGroups">
+{% for client in clients %}
+    <div class="client-group">
+        {% set ready_count = client.workstations|selectattr('status', 'equalto', 'Ready to Upgrade')|list|length %}
+        {% set completed_count = client.workstations|selectattr('status', 'equalto', 'Completed')|list|length %}
+        {% set total = client.workstations|length %}
+        <div class="client-header{% if total > 0 and completed_count == total %} completed-company{% elif ready_count > 0 %} ready-company{% endif %}" onclick="toggleClient('{{ client.name|replace(' ', '_') }}')">
+            <span class="collapse-toggle" id="toggle-{{ client.name|replace(' ', '_') }}">[+]</span>
+            <strong>{{ client.name }}</strong>&nbsp; <span>({{ client.workstations|length }} systems)</span>
+            &nbsp;&nbsp;&nbsp;<button class="import-btn" type="button" onclick="event.stopPropagation(); showAddModal({{ client.id }}, '{{ client.name }}')">+ Add Workstation</button>
+            {% if client.ready_for_ticket %}
+            &nbsp;<button class="import-btn project-ticket-btn" type="button" onclick="event.stopPropagation(); createProjectTicket({{ client.id }}, '{{ client.name }}')">Create Project Ticket</button>
+            {% endif %}
+        </div>
+        <div id="client-{{ client.name|replace(' ', '_') }}" class="workstations" style="display: none;">
+            <table>
+                <tr>
+                    <th>Computer Name</th>
+                    <th>Processor</th>
+                    <th data-type="number">RAM</th>
+                    <th data-type="number">Remaining Disk</th>
+                    <th>Status</th>
+                    <th>Technician</th>
+                    <th>Notes</th>
+                    <th>Updated in Automate</th>
+                    <th>Actions</th>
+                </tr>
+                {% for ws in client.workstations %}
+                    <tr data-wsid="{{ ws.id }}" data-automate="{{ 'updated' if ws.updated_in_automate else 'not-updated' }}"{% if ws.status == "Completed" %} class="completed-row"{% endif %}>
+                        <td>{{ ws.computer_name }}</td>
+                        <td>{{ ws.processor_name }}</td>
+                        <td>{{ ws.ram_gb }}GB</td>
+                        <td>{{ ws.diskspace_remaining_gb }}GB</td>
+                        <td>
+                            <select onchange="updateField({{ ws.id }}, 'status', this.value)" {% if ws.status == 'Completed' %}disabled{% endif %}>
+                                {% for status in statuses %}
+                                    <option value="{{ status }}" {% if ws.status == status %}selected{% endif %}>{{ status }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <select onchange="updateField({{ ws.id }}, 'technician', this.value)" {% if ws.status == 'Completed' %}disabled{% endif %}>
+                                <option value="">- Technician -</option>
+                                {% for tech in technicians %}
+                                    <option value="{{ tech }}" {% if ws.technician == tech %}selected{% endif %}>{{ tech }}</option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>
+                            <input type="text" value="{{ ws.notes }}" onblur="updateField({{ ws.id }}, 'notes', this.value)" {% if ws.status == 'Completed' %}disabled{% endif %}>
+                        </td>
+                        <td class="automate-cell">
+                            <input type="checkbox" class="automate-checkbox" id="automate-{{ ws.id }}" {% if ws.updated_in_automate %}checked{% endif %} {% if ws.status != 'Completed' %}disabled{% endif %} onchange="updateAutomateStatus({{ ws.id }}, this.checked)">
+                        </td>
+                        <td>
+                            <button class="import-btn" type="button" style="background:#5c51a4;" onclick="showEditModal({{ ws.id }})">Edit</button>
+                            <form method="post" action="/workstations/{{ ws.id }}/delete" style="display:inline;" class="delete-form">
+                                <button type="submit" class="import-btn" style="background:#bb3f3f;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </table>
+        </div>
+    </div>
+{% endfor %}
+</div>

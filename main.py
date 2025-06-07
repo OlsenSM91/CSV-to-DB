@@ -62,27 +62,6 @@ def get_db():
     finally:
         db.close()
 
-def compute_stats(db):
-    total = db.query(Workstation).count()
-    completed = db.query(Workstation).filter(Workstation.status == "Completed").count()
-    in_progress = db.query(Workstation).filter(Workstation.status == "In Progress").count()
-    ready = db.query(Workstation).filter(Workstation.status == "Ready to Upgrade").count()
-    not_started = db.query(Workstation).filter(
-        Workstation.status.in_(["- Select Status -", "Assigned", "Pending Upgrade"])
-    ).count()
-    completed_and_updated = db.query(Workstation).filter(
-        Workstation.status == "Completed",
-        Workstation.updated_in_automate == True,
-    ).count()
-    return {
-        "total": total,
-        "completed": completed,
-        "in_progress": in_progress,
-        "not_started": not_started,
-        "ready_to_upgrade": ready,
-        "completed_and_updated": completed_and_updated,
-    }
-
 def build_dashboard_context(
     request: Request,
     db,
@@ -152,9 +131,6 @@ def build_dashboard_context(
 
     clients_list = list(clients.values())
     clients_list.sort(key=lambda c: c["name"])
-
-    stats = compute_stats(db)
-
     all_clients = [c.name for c in db.query(Client).order_by(Client.name)]
     all_ram = sorted(set(ws.ram_gb for ws in db.query(Workstation) if ws.ram_gb))
     all_clients_objs = db.query(Client).order_by(Client.name).all()
@@ -167,7 +143,6 @@ def build_dashboard_context(
         "all_clients": all_clients,
         "all_ram": all_ram,
         "all_clients_objs": all_clients_objs,
-        "stats": stats,
     }
 
 @app.get("/", response_class=HTMLResponse)
@@ -406,14 +381,6 @@ async def update_field(
         setattr(ws, field, value)
 
     db.commit()
-    stats = compute_stats(db)
-    await manager.broadcast({
-        "action": "field_update",
-        "id": ws.id,
-        "field": field,
-        "value": getattr(ws, field),
-        "stats": stats,
-    })
     return JSONResponse({"ok": True})
 
 @app.post("/import")

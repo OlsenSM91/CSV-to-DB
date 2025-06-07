@@ -29,34 +29,6 @@ function applyFieldUpdate(id, field, value) {
     }
 }
 
-function updateStats(stats) {
-    if (!stats) return;
-    if (stats.total !== undefined) {
-        const el = document.getElementById('statTotal');
-        if (el) el.textContent = stats.total;
-    }
-    if (stats.completed !== undefined) {
-        const el = document.getElementById('statCompleted');
-        if (el) el.textContent = stats.completed;
-    }
-    if (stats.ready_to_upgrade !== undefined) {
-        const el = document.getElementById('statReady');
-        if (el) el.textContent = stats.ready_to_upgrade;
-    }
-    if (stats.in_progress !== undefined) {
-        const el = document.getElementById('statInProgress');
-        if (el) el.textContent = stats.in_progress;
-    }
-    if (stats.not_started !== undefined) {
-        const el = document.getElementById('statNotStarted');
-        if (el) el.textContent = stats.not_started;
-    }
-    if (stats.completed_and_updated !== undefined) {
-        const el = document.getElementById('statAutomate');
-        if (el) el.textContent = stats.completed_and_updated;
-    }
-}
-
 function updateField(id, field, value) {
     fetch("/update", {
         method: "POST",
@@ -98,7 +70,6 @@ socket.addEventListener('message', function(event) {
         if (data.action === 'field_update') {
             applyFieldUpdate(data.id, data.field, data.value);
             checkProjectTicketReadiness();
-            if (data.stats) updateStats(data.stats);
         } else if (data.action === 'refresh') {
             refreshDashboard();
         }

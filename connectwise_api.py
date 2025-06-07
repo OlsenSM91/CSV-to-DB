@@ -221,7 +221,7 @@ async def create_project_ticket(
                 print(f"Warning: Could not find member {tech_name} in ConnectWise")
         return True, ticket_id, "Ticket created successfully"
 
-async def check_company_workstations_ready(workstations: List[Dict]) -> bool:
+def check_company_workstations_ready(workstations: List[Dict]) -> bool:
     """Check if all workstations for a company have status and technician assigned."""
     if not workstations:
         return False

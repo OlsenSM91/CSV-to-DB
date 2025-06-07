@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, Form, UploadFile, File, Depends, HTTPException
 from fastapi.responses import HTMLResponse, StreamingResponse, RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -8,7 +8,6 @@ from starlette.status import HTTP_303_SEE_OTHER
 import os
 import io
 import csv
-import json
 from datetime import datetime
 from models import Base, Client, Workstation
 from utils import import_csv_to_db, export_workstations
@@ -23,32 +22,6 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections = set()
-
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.add(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.discard(websocket)
-
-    async def broadcast(self, message: dict):
-        data = json.dumps(message)
-        disconnected = []
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_text(data)
-            except Exception:
-                disconnected.append(connection)
-        for conn in disconnected:
-            self.disconnect(conn)
-
-
-manager = ConnectionManager()
-
 TECHNICIANS = ["Brian", "Ed", "Steven", "Roy", "Jessica"]
 STATUS_LIST = [
     "- Select Status -", "Assigned", "Ready to Upgrade", "Scheduled", "In Progress",
@@ -62,18 +35,19 @@ def get_db():
     finally:
         db.close()
 
-def build_dashboard_context(
+@app.get("/", response_class=HTMLResponse)
+def dashboard(
     request: Request,
-    db,
     client: str = "",
     ram: str = "",
     technician: str = "",
     status: str = "",
     search: str = "",
     automate: str = "",
+    db=Depends(get_db)
 ):
     ws_query = db.query(Workstation).options(joinedload(Workstation.client))
-
+    
     if client:
         ws_query = ws_query.join(Client).filter(Client.name == client)
     if ram:
@@ -98,9 +72,10 @@ def build_dashboard_context(
                 Client.name.ilike(like)
             )
         )
-
+    
     workstations = ws_query.all()
 
+    # Group by client and check readiness for project ticket
     clients = {}
     for ws in workstations:
         if ws.client:
@@ -112,9 +87,9 @@ def build_dashboard_context(
         if cid not in clients:
             clients[cid] = {"id": cid, "name": cname, "workstations": []}
         clients[cid]["workstations"].append(ws)
-
+    
+    # Check if each client is ready for project ticket
     for client_data in clients.values():
-        client_data["workstations"].sort(key=lambda w: w.computer_name.lower())
         ws_dicts = [
             {
                 "computer_name": ws.computer_name,
@@ -128,10 +103,11 @@ def build_dashboard_context(
             for ws in client_data["workstations"]
         ]
         client_data["ready_for_ticket"] = check_company_workstations_ready(ws_dicts)
-
+    
     clients_list = list(clients.values())
     clients_list.sort(key=lambda c: c["name"])
 
+    # Calculate statistics
     total_ws = db.query(Workstation).count()
     completed_ws = db.query(Workstation).filter(Workstation.status == "Completed").count()
     in_progress_ws = db.query(Workstation).filter(Workstation.status == "In Progress").count()
@@ -145,8 +121,8 @@ def build_dashboard_context(
     all_clients = [c.name for c in db.query(Client).order_by(Client.name)]
     all_ram = sorted(set(ws.ram_gb for ws in db.query(Workstation) if ws.ram_gb))
     all_clients_objs = db.query(Client).order_by(Client.name).all()
-
-    return {
+    
+    return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "clients": clients_list,
         "technicians": TECHNICIANS,
@@ -160,56 +136,9 @@ def build_dashboard_context(
             "in_progress": in_progress_ws,
             "not_started": not_started_ws,
             "ready_to_upgrade": ready_to_upgrade_ws,
-            "completed_and_updated": completed_and_updated,
-        },
-    }
-
-@app.get("/", response_class=HTMLResponse)
-def dashboard(
-    request: Request,
-    client: str = "",
-    ram: str = "",
-    technician: str = "",
-    status: str = "",
-    search: str = "",
-    automate: str = "",
-    db=Depends(get_db)
-):
-    context = build_dashboard_context(
-        request,
-        db,
-        client=client,
-        ram=ram,
-        technician=technician,
-        status=status,
-        search=search,
-        automate=automate,
-    )
-    return templates.TemplateResponse("dashboard.html", context)
-
-
-@app.get("/fragment", response_class=HTMLResponse)
-def dashboard_fragment(
-    request: Request,
-    client: str = "",
-    ram: str = "",
-    technician: str = "",
-    status: str = "",
-    search: str = "",
-    automate: str = "",
-    db=Depends(get_db),
-):
-    context = build_dashboard_context(
-        request,
-        db,
-        client=client,
-        ram=ram,
-        technician=technician,
-        status=status,
-        search=search,
-        automate=automate,
-    )
-    return templates.TemplateResponse("dashboard_fragment.html", context)
+            "completed_and_updated": completed_and_updated
+        }
+    })
 
 @app.post("/workstations/add")
 async def add_workstation(
@@ -237,14 +166,10 @@ async def add_workstation(
     )
     db.add(ws)
     db.commit()
-    await manager.broadcast({"action": "refresh"})
-    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"success": True})
     return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
 @app.post("/workstations/{ws_id}/edit")
 async def edit_workstation(
-    request: Request,
     ws_id: int,
     computer_name: str = Form(...),
     processor_name: str = Form(...),
@@ -275,14 +200,10 @@ async def edit_workstation(
     ws.technician = technician
     ws.notes = notes
     db.commit()
-    await manager.broadcast({"action": "refresh"})
-    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"success": True})
     return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
 @app.post("/workstations/{ws_id}/delete")
 async def delete_workstation(
-    request: Request,
     ws_id: int,
     db=Depends(get_db)
 ):
@@ -290,9 +211,6 @@ async def delete_workstation(
     if ws:
         db.delete(ws)
         db.commit()
-        await manager.broadcast({"action": "refresh"})
-    if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
-        return JSONResponse({"success": True})
     return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
 
 @app.get("/export")
@@ -398,14 +316,12 @@ async def update_field(
         ws.updated_in_automate = value.lower() in ['true', '1', 'yes']
     else:
         setattr(ws, field, value)
-
+    
     db.commit()
-    await manager.broadcast({"action": "field_update", "id": ws.id, "field": field, "value": getattr(ws, field)})
     return JSONResponse({"ok": True})
 
 @app.post("/import")
 async def import_csv(
-    request: Request,
     file: UploadFile = File(...),
     db=Depends(get_db)
 ):
@@ -418,9 +334,6 @@ async def import_csv(
     try:
         import_csv_to_db(temp_path, db)
         os.remove(temp_path)
-        await manager.broadcast({"action": "refresh"})
-        if request.headers.get("x-requested-with") == "XMLHttpRequest" or "application/json" in request.headers.get("accept", ""):
-            return JSONResponse({"success": True})
         return RedirectResponse("/", status_code=HTTP_303_SEE_OTHER)
     except Exception as e:
         if os.path.exists(temp_path):
@@ -507,13 +420,3 @@ async def check_ticket_readiness(
     
     ready = check_company_workstations_ready(ws_data)
     return JSONResponse({"ready": ready})
-
-
-@app.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket):
-    await manager.connect(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
